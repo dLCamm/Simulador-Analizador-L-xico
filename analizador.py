@@ -3,7 +3,7 @@ from collections import Counter
 
 class AnalizadorLexico:
     def __init__(self):
-        # Palabras reservadas 
+        # Palabras reservadas (case-sensitive)
         self.palabras_reservadas = {
             'entero', 'decimal', 'booleano', 'cadena', 'si', 'sino', 
             'mientras', 'hacer', 'verdadero', 'falso'
@@ -14,7 +14,7 @@ class AnalizadorLexico:
             '+', '-', '*', '/', '%', '=', '==', '<', '>', '>=', '<='
         }
         
-        # Signos
+        # Signos (las comas NO están incluidas porque no son válidas en el lenguaje)
         self.signos = {
             '(', ')', '{', '}', '"', ';'
         }
@@ -29,8 +29,8 @@ class AnalizadorLexico:
         tokens = []
         errores = []
         
-        # Dividir la línea en tokens considerando todos los delimitadores
-        elementos = self._dividir_linea_avanzado(linea)
+        # Dividir la línea en tokens considerando espacios y comas como delimitadores
+        elementos = self._dividir_linea_con_comas(linea)
         
         for elemento in elementos:
             if not elemento.strip():  # Saltar espacios vacíos
@@ -45,7 +45,7 @@ class AnalizadorLexico:
         
         return tokens, errores
     
-    def _dividir_linea_avanzado(self, linea):
+    def _dividir_linea_con_comas(self, linea):
         elementos = []
         i = 0
         n = len(linea)
@@ -73,16 +73,21 @@ class AnalizadorLexico:
                 elementos.append(linea[i:i+2])
                 i += 2
             
-            # Verificar operadores y signos de un solo carácter
+            # Verificar operadores y signos de un solo carácter (EXCLUYENDO COMA)
             elif linea[i] in self.operadores or linea[i] in self.signos:
                 elementos.append(linea[i])
+                i += 1
+            
+            # Verificar comas (las tratamos como separadores individuales)
+            elif linea[i] == ',':
+                elementos.append(',')  # La coma como token separado
                 i += 1
             
             # Palabras y números
             else:
                 j = i
-                # Avanzar hasta encontrar un delimitador
-                while j < n and not linea[j].isspace() and linea[j] not in self.operadores and linea[j] not in self.signos and linea[j] != '"':
+                # Avanzar hasta encontrar un delimitador (espacio, operador, signo o coma)
+                while j < n and not linea[j].isspace() and linea[j] not in self.operadores and linea[j] not in self.signos and linea[j] != ',' and linea[j] != '"':
                     j += 1
                 palabra = linea[i:j]
                 if palabra:  # Solo agregar si no está vacía
@@ -102,7 +107,7 @@ class AnalizadorLexico:
         if elemento in self.operadores:
             return "Operador"
         
-        # Verificar signos
+        # Verificar signos válidos
         if elemento in self.signos:
             return "Signo"
         
@@ -122,6 +127,7 @@ class AnalizadorLexico:
         if re.match(self.patron_identificadores, elemento):
             return "Identificador"
         
+        # Las comas y cualquier otro carácter no reconocido
         return "DESCONOCIDO"
     
     def analizar_archivo(self, contenido):
@@ -138,32 +144,55 @@ class AnalizadorLexico:
         return todos_tokens, todos_errores
     
     def generar_reporte(self, tokens):
-        # Contar tokens por tipo
-        contador = Counter(tipo for _, tipo, _ in tokens)
+        # Contar la frecuencia de cada token (INCLUYENDO los no reconocidos)
+        contador_tokens = Counter((token, tipo) for token, tipo, _ in tokens)
         
         reporte = "REPORTE DE TOKENS - ANALIZADOR LÉXICO\n"
         reporte += "=" * 60 + "\n\n"
         
-        reporte += "RESUMEN POR TIPO:\n"
-        reporte += "-" * 30 + "\n"
-        for tipo, cantidad in contador.items():
-            reporte += f"{tipo}: {cantidad} tokens\n"
+        reporte += "TOKENS ENCONTRADOS (CLASIFICADOS POR TIPO Y CANTIDAD):\n"
+        reporte += "=" * 70 + "\n\n"
         
-        reporte += "\nDETALLE COMPLETO (por línea):\n"
+        reporte += f"{'TOKEN':<20} {'TIPO':<25} {'CANTIDAD':<10}\n"
+        reporte += "-" * 55 + "\n"
+        
+        # Ordenar por tipo y luego por token (INCLUYENDO DESCONOCIDOS)
+        tokens_ordenados = sorted(contador_tokens.items(), key=lambda x: (x[0][1], x[0][0]))
+        
+        for (token, tipo), cantidad in tokens_ordenados:
+            reporte += f"{token:<20} {tipo:<25} {cantidad:<10}\n"
+        
+        # Resumen por tipo (INCLUYENDO tokens no reconocidos)
+        contador_tipos = Counter(tipo for _, tipo, _ in tokens)
+        
+        reporte += "\n" + "=" * 55 + "\n"
+        reporte += "RESUMEN POR TIPO DE TOKEN (TODOS):\n"
         reporte += "-" * 40 + "\n"
         
-        # Agrupar tokens por línea
-        tokens_por_linea = {}
-        for token, tipo, linea in tokens:
-            if linea not in tokens_por_linea:
-                tokens_por_linea[linea] = []
-            tokens_por_linea[linea].append((token, tipo))
+        for tipo, cantidad in contador_tipos.items():
+            reporte += f"{tipo}: {cantidad} tokens\n"
         
-        for linea in sorted(tokens_por_linea.keys()):
-            reporte += f"\nLÍNEA {linea}:\n"
-            reporte += f"{'TOKEN':<20} {'TIPO':<20}\n"
-            reporte += "-" * 40 + "\n"
-            for token, tipo in tokens_por_linea[linea]:
-                reporte += f"{token:<20} {tipo:<20}\n"
+        # Separar tokens válidos y no reconocidos
+        tokens_validos = [t for t in tokens if t[1] != "DESCONOCIDO"]
+        tokens_no_reconocidos = [t for t in tokens if t[1] == "DESCONOCIDO"]
+        
+        reporte += "\n" + "=" * 55 + "\n"
+        reporte += f"TOTAL DE TOKENS VÁLIDOS: {len(tokens_validos)}\n"
+        reporte += f"TOTAL GENERAL: {len(tokens)}\n"
+        
+        # Mostrar ejemplos de tokens no reconocidos si hay
+        if tokens_no_reconocidos:
+            reporte += "\nEJEMPLOS DE TOKENS NO RECONOCIDOS:\n"
+            reporte += "-" * 35 + "\n"
+            # Mostrar solo algunos ejemplos únicos
+            tokens_unicos_no_reconocidos = set(token for token, tipo, _ in tokens_no_reconocidos)
+            for i, token in enumerate(list(tokens_unicos_no_reconocidos)[:5]):  # Mostrar máximo 5 ejemplos
+                reporte += f"- '{token}'\n"
+            if len(tokens_unicos_no_reconocidos) > 5:
+                reporte += f"- ... y {len(tokens_unicos_no_reconocidos) - 5} más\n"
         
         return reporte
+      
+            
+        
+ 
