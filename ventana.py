@@ -2,9 +2,12 @@ import tkinter as tk
 from tkinter import ttk
 from analizador import AnalizadorLexico
 from main import manejo_de_archivos
+from sintactico import AnalizadorSintactico
+
 
 class ventana_principal:
     def __init__(self):
+        self.analizador_sintactico = AnalizadorSintactico()
         self.ventana = tk.Tk()
         self.ventana.title("Analizador Léxico")
         self.ventana.geometry("1200x700")
@@ -129,6 +132,20 @@ class ventana_principal:
                 resultado += "\n"
             else:
                 resultado += "✓ No se encontraron errores léxicos\n\n"
+
+            
+            # para lo sintactico
+            errores_sintacticos = self.analizador_sintactico.analizar(tokens)
+
+            if errores_sintacticos:
+                resultado += "ERRORES SINTÁCTICOS:\n"
+                resultado += "-" * 30 + "\n"
+                for error in errores_sintacticos:
+                    resultado += error + "\n"
+                resultado += "\n"
+            else:
+                resultado += "✓ No se encontraron errores sintácticos\n\n"
+            
             
             resultado += "TOKENS RECONOCIDOS (POR LÍNEA):\n"
             resultado += "=" * 40 + "\n"
