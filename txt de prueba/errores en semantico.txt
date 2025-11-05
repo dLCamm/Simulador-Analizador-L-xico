@@ -1,0 +1,134 @@
+Algoritmo SistemaGestionInventarios
+    Definir opcion, cantidad, precio, total, i, j Como Entero
+    Definir producto, categoria, busqueda Como Caracter
+    Definir encontrado, activo Como Logico
+    Definir inventario[100, 5] Como Real
+    Definir ventas[50] Como Real
+    Definir fecha Como Caracter
+
+    cantidadProductos <- 0
+    totalVentas <- 0.0
+    fechaActual <- "2024-01-01"
+    productosVendidos <- 0
+    cantidad <- "veinte"
+
+    Mientras continuar Hacer
+        Escribir "=== SISTEMA DE GESTIÓN DE INVENTARIOS ==="
+        Escribir "1. Agregar producto"
+        Escribir "2. Buscar producto"
+        Escribir "3. Realizar venta"
+        Escribir "4. Generar reporte"
+        Escribir "5. Salir"
+        Escribir "Seleccione una opción: "
+        Leer opcion
+
+        Segun opcion Hacer
+            1:
+                Si cantidadProductos < 100 Entonces
+                    Escribir "Ingrese nombre del producto: "
+                    Leer producto
+                    Escribir "Ingrese categoría: "
+                    Leer categoria
+                    Escribir "Ingrese precio: "
+                    Leer precio
+                    Escribir "Ingrese cantidad en stock: "
+                    Leer cantidad
+
+                    encontrado <- precio + cantidad
+
+                    inventario[cantidadProductos, 0] <- producto
+                    inventario[cantidadProductos, 1] <- categoria
+                    inventario[cantidadProductos, 2] <- precio
+                    inventario[cantidadProductos, 3] <- cantidad
+                    inventario[cantidadProductos, 4] <- Verdadero
+
+                    cantidadProductos <- cantidadProductos + 1
+                    Escribir "Producto agregado exitosamente!"
+                Sino
+                    Escribir "Inventario lleno"
+                FinSi
+
+            2:
+                Escribir "Ingrese nombre a buscar: "
+                Leer busqueda
+
+                encontrado <- Falso
+                Para i <- 0 Hasta cantidadProductos - 1 Hacer
+                    Si inventario[i, 0] = i Entonces
+                        encontrado <- Verdadero
+                        Escribir "Producto encontrado: ", inventario[i, 0]
+                        Escribir "Categoría: ", inventario[i, 1]
+                        Escribir "Precio: ", inventario[i, 2]
+                        Escribir "Stock: ", inventario[i, 3]
+                    FinSi
+                FinPara
+
+                Si no encontrado Entonces
+                    Escribir "Producto no encontrado"
+                FinSi
+
+            3:
+                Escribir "Ingrese nombre del producto a vender: "
+                Leer producto
+                Escribir "Ingrese cantidad a vender: "
+                Leer cantidadVender
+
+                encontrado <- Falso
+                Para i <- 0 Hasta cantidadProductos - 1 Hacer
+                    Si inventario[i, 0] = producto Entonces
+                        encontrado <- Verdadero
+                        stockActual <- inventario[i, 3]
+
+                        Si cantidadVender <= stockActual Entonces
+                            totalVenta <- inventario[i, 2] * cantidadVender
+                            inventario[i, 3] <- stockActual - cantidadVender
+                            totalVentas <- totalVentas + totalVenta
+
+                            ventas[productosVendidos] <- totalVenta
+                            productosVendidos <- productosVendidos + 1
+
+                            Escribir "Venta realizada. Total: ", totalVenta
+                        Sino
+                            Escribir "Stock insuficiente"
+                        FinSi
+                    FinSi
+                FinPara
+
+                Si no encontrado Entonces
+                    Escribir "Producto no encontrado"
+                FinSi
+
+            4:
+                Escribir "=== REPORTE DE INVENTARIO ==="
+                Escribir "Total productos: ", cantidadProductos
+                Escribir "Total ventas: ", totalVentas
+                Escribir "Productos en inventario:"
+
+                totalValorInventario <- 0.0
+                Para i <- 0 Hasta cantidadProductos - 1 Hacer
+                    valorProducto <- inventario[i, 2] * inventario[i, 3]
+                    totalValorInventario <- totalValorInventario + valorProducto
+                    Escribir "Producto: ", inventario[i, 0], " - Valor: ", valorProducto
+                FinPara
+
+                Escribir "Valor total del inventario: ", totalValorInventario
+
+                Si totalValorInventario Y cantidadProductos > 0 Entonces
+                    Escribir "Inventario con valor positivo"
+                FinSi
+
+            5:
+                Escribir "Saliendo del sistema..."
+                activo <- Falso
+
+            De Otro Modo:
+                Escribir "Opción no válida"
+        FinSegun
+
+        Escribir ""
+    FinMientras
+
+    Definir variableNoUsada1, variableNoUsada2 Como Entero
+    Definir textoNoUsado Como Caracter
+
+FinAlgoritmo

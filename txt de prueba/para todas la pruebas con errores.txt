@@ -1,0 +1,73 @@
+Algoritmo GestionInventarioConErrores
+    Definir opcion, cantidad, precio, i, codigo Como Entero
+    Definir producto, categoria, busqueda Como Caracter
+    Definir encontrado, activo Como Logico
+    
+    // Error sintáctico: falta cerrar la declaración
+    Definir inventario[100] Como @Real@
+    
+    cantidad <- 0
+    activo <- Verdadero
+    
+    // Error sintáctico: función mal declarada (falta paréntesis de cierre
+    Funcion registrarProducto(nombre, prec, categ
+        Si cantidad < 100 Entonces
+            inventario[cantidad] <- prec
+            cantidad <- cantidad + 1
+            Escribir "Producto registrado: ", nombre
+        Sino
+            Escribir "Inventario lleno"
+        FinSi
+    FinFuncion
+    
+    // Error sintáctico: estructura si mal formada
+    Funcion buscarProducto(codigoBusqueda
+        encontrado <- Falso
+        Para i <- 0 Hasta cantidad - 1 Hacer
+            Si i = codigoBusqueda Entonces
+                encontrado <- Verdadero
+                Escribir "Producto encontrado"
+            FinSi
+        FinPara
+        
+        Si no encontrado
+            Escribir "Producto no encontrado"
+        FinSi
+    FinFuncion
+
+    Mientras activo Hacer
+        Escribir "=== SISTEMA DE INVENTARIO ==="
+        Escribir "1. Registrar producto"
+        Escribir "2. Buscar producto"
+        Escribir "3. Salir"
+        Escribir "Seleccione opción: "
+        Leer opcion
+        
+        Segun opcion Hacer
+            1:
+                Escribir "Ingrese nombre: "
+                Leer producto
+                Escribir "Ingrese precio: "
+                Leer precio
+                Escribir "Ingrese categoría: "
+                Leer categoria
+                
+                // Error sintáctico: llamada a función con paréntesis sin cerrar
+                registrarProducto(producto, precio, categoria
+                
+            2:
+                Escribir "Ingrese código: "
+                Leer codigo
+                buscarProducto(codigo)
+                
+            3:
+                Escribir "Saliendo..."
+                activo <- Falso
+                
+            // Error sintáctico: falta FinSegun
+    FinMientras
+    
+    // Error sintáctico: cadena sin cerrar
+    Escribir "Fin del programa
+    
+FinAlgoritmo
