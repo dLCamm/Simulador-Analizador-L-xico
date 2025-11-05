@@ -10,22 +10,22 @@ class AnalizadorLexico:
             'Definir', 'Como', 'Entero', 'Real', 'Caracter', 'Logico',
             'Escribir', 'Leer', 'Si', 'Entonces', 'Sino', 'FinSi',
             'Para', 'Hasta', 'Con', 'Paso', 'Hacer', 'FinPara',
-            'Mientras', 'Hacer', 'FinMientras', 'Repetir', 'Hasta',
-            'Segun', 'Hacer', 'De', 'Otro', 'FinSegun',
-            'Dimension', 'Como', 'Verdadero', 'Falso'
+            'Mientras', 'FinMientras', 'Repetir', 
+            'Segun', 'De', 'Otro', 'FinSegun',  
+            'Dimension', 'Verdadero', 'Falso'
         }
-        
+            
         # Operadores de PSeInt
         self.operadores = {
-            '+', '-', '*', '/', '%', '^', '=', '<>', '<', '>', '<=', '>=',
+            '+', '-', '*', '/', '%', '^', '=', '<>', '<', '>', '<=', '>=', '<-', '->',
             'Y', 'O', 'NO', '&'  # & para concatenación
         }
-        
+
         # Signos PERMITIDOS en PSeInt
         self.signos_permitidos = {
-            '(', ')', ',', ';', '[', ']', '"'
+            '(', ')', ',', ';', '[', ']', '"', ':'
         }
-        
+      
         # Expresiones regulares para PSeInt
         self.patron_numeros = r'^\d+$'
         self.patron_decimal = r'^\d+\.\d+$'
@@ -52,7 +52,7 @@ class AnalizadorLexico:
         return tokens, errores
     
     def _dividir_linea_pseint(self, linea):
-        """Divide la línea según las reglas de PSeInt"""
+        """Divide la línea según las reglas de PSeInt - CORREGIDO"""
         elementos = []
         i = 0
         n = len(linea)
@@ -62,28 +62,39 @@ class AnalizadorLexico:
                 i += 1
                 continue
             
-            # Verificar si es una cadena entre comillas
+            # Verificar si es una cadena entre comillas - MEJORADO
             if linea[i] == '"':
                 j = i + 1
                 while j < n and linea[j] != '"':
                     j += 1
                 if j < n:
+                    # Encontramos comilla de cierre
                     elementos.append(linea[i:j+1])
                     i = j + 1
                 else:
-                    # Comilla sin cerrar
+                    # Comilla sin cerrar, tomamos hasta el final
                     elementos.append(linea[i:])
                     i = n
+                continue
+            
+            # Verificar comentarios
+            if i + 1 < n and linea[i:i+2] == "//":
+                # Todo lo que sigue es comentario
+                elementos.append(linea[i:])
+                i = n
+                continue
             
             # Verificar operadores de múltiples caracteres
-            elif i + 1 < n and linea[i:i+2] in {'<>', '<=', '>='}:
+            elif i + 1 < n and linea[i:i+2] in {'<-', '->', '<>', '<=', '>='}:
                 elementos.append(linea[i:i+2])
                 i += 2
+                continue
             
             # Verificar operadores y signos de un solo carácter
             elif linea[i] in self.operadores or linea[i] in self.signos_permitidos:
                 elementos.append(linea[i])
                 i += 1
+                continue
             
             # Palabras y números
             else:
@@ -92,7 +103,8 @@ class AnalizadorLexico:
                 while j < n and not linea[j].isspace() and \
                       linea[j] not in self.operadores and \
                       linea[j] not in self.signos_permitidos and \
-                      linea[j] != '"':
+                      linea[j] != '"' and \
+                      not (j + 1 < n and linea[j:j+2] == "//"):
                     j += 1
                 palabra = linea[i:j]
                 if palabra:
@@ -103,39 +115,47 @@ class AnalizadorLexico:
     
     def _determinar_tipo_pseint(self, elemento):
         elemento = elemento.strip()
+        e_lower = elemento.lower()
         
-        # Verificar palabras reservadas (case-insensitive como en PSeInt)
-        if elemento.lower() in [p.lower() for p in self.palabras_reservadas]:
-            # Encontrar la palabra exacta con el case correcto
-            for palabra in self.palabras_reservadas:
-                if palabra.lower() == elemento.lower():
-                    return "Palabra Reservada"
+        # Verificar si es comentario primero
+        if elemento.startswith("//"):
+            return "Comentario"
         
-        # Verificar operadores
+        # Palabras reservadas (case-insensitive)
+        if e_lower in [p.lower() for p in self.palabras_reservadas]:
+            return "Palabra Reservada"
+        
+        # Operadores
         if elemento in self.operadores:
             return "Operador"
         
-        # Verificar signos permitidos
+        # Signos permitidos
         if elemento in self.signos_permitidos:
             return "Signo"
         
-        # Verificar números enteros
+        # Números enteros
         if re.match(self.patron_numeros, elemento):
             return "Número"
         
-        # Verificar números decimales
+        # Números decimales
         if re.match(self.patron_decimal, elemento):
             return "Decimal"
         
-        # Verificar cadenas entre comillas
+        # Cadenas entre comillas
         if re.match(self.patron_cadena, elemento):
             return "Cadena"
         
-        # Verificar identificadores
+        # Identificadores (incluye snake_case)
         if re.match(self.patron_identificadores, elemento):
-            return "Identificador"
+            # Verificar si es snake_case válido (opcional, para tu reporte)
+            if "_" in elemento:
+                return "Identificador (snake_case)"
+            else:
+                return "Identificador"
         
+        # Si no coincide con ningún patrón válido
         return "DESCONOCIDO"
+
     
     def analizar_archivo(self, contenido):
         lineas = contenido.split('\n')
