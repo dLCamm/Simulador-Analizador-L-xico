@@ -2,7 +2,7 @@ import re
 
 class AnalizadorSemantico:
     def __init__(self):
-        # tabla de símbolos usando tipos de PSeInt
+        # Tabla de símbolos y estructuras auxiliares
         self.tabla_simbolos = {}
         self.errores = []
         self.funciones = {}
@@ -14,48 +14,56 @@ class AnalizadorSemantico:
         self.funciones = {}
         self.variables_usadas = set()
 
-    def _tipo_de_literal(self, token, tipo_token):
-        # Determina tipo semántico según PSeInt
-        if tipo_token == "Número":
-            return "Entero"
-        if tipo_token == "Decimal":
-            return "Real"
-        if tipo_token == "Cadena":
-            return "Caracter"
-        if token.lower() in ("verdadero", "falso"):
-            return "Logico"
-        return None
+    # ------------------------------------------------------------
+    # MÉTODOS PRINCIPALES
+    # ------------------------------------------------------------
 
     def analizar(self, tokens):
         self.limpiar()
 
-        # Agrupar tokens por linea
+        # Agrupar tokens por línea
         tokens_por_linea = {}
         for token, tipo, linea in tokens:
             tokens_por_linea.setdefault(linea, []).append((token, tipo))
 
-        # Primera pasada: declaraciones con "Definir" y "Dimension"
+        # PRIMERA PASADA: Declaraciones y funciones
         for linea in sorted(tokens_por_linea.keys()):
             lista = tokens_por_linea[linea]
             if not lista:
                 continue
 
+            self._analizar_funcion_pseint(linea, lista)
             self._analizar_definicion_pseint(linea, lista)
-            self._analizar_dimension_pseint(linea, lista)   
+            self._analizar_dimension_pseint(linea, lista)
 
-        # Segunda pasada: asignaciones y usos
+        # SEGUNDA PASADA: Asignaciones y uso de variables
+        contexto_funcion = None
         for linea in sorted(tokens_por_linea.keys()):
             lista = tokens_por_linea[linea]
             if not lista:
                 continue
+
+            # Detectar inicio o fin de función
+            if lista[0][0].lower() == "funcion" and len(lista) > 1:
+                contexto_funcion = lista[1][0]
+            elif lista[0][0].lower() in {"finfuncion", "finalgoritmo", "finproceso"}:
+                contexto_funcion = None
 
             self._analizar_asignaciones_pseint(linea, lista)
             self._verificar_usos_variables(linea, lista)
+            self._analizar_retorno_pseint(linea, lista, contexto_funcion)
 
-        # Tercera pasada: verificar variables no usadas
+        # TERCERA PASADA: Verificar llamadas a funciones
+        for linea in sorted(tokens_por_linea.keys()):
+            lista = tokens_por_linea[linea]
+            if not lista:
+                continue
+            self._verificar_llamadas_funciones(linea, lista)
+
+        # CUARTA PASADA: Variables no usadas
         self._verificar_variables_no_usadas()
 
-        # eliminar duplicados
+        # Eliminar errores duplicados
         seen = set()
         errores_unicos = []
         for e in self.errores:
@@ -63,7 +71,7 @@ class AnalizadorSemantico:
                 errores_unicos.append(e)
                 seen.add(e)
 
-        # Crear tabla de símbolos simplificada para la interfaz
+        # Crear tabla de símbolos simplificada
         tabla_simbolos_simple = {}
         for var, info in self.tabla_simbolos.items():
             if isinstance(info, dict):
@@ -73,14 +81,16 @@ class AnalizadorSemantico:
 
         return errores_unicos, tabla_simbolos_simple
 
+    # ------------------------------------------------------------
+    # DECLARACIONES
+    # ------------------------------------------------------------
+
     def _analizar_definicion_pseint(self, linea, lista):
         """Analiza declaraciones con 'Definir' de PSeInt"""
         if len(lista) >= 4 and lista[0][0].lower() == "definir":
-            # Estructura: Definir var1, var2, ... Como Tipo
             i = 1
             variables = []
-            
-            # Recoger todas las variables hasta "Como"
+
             while i < len(lista) and lista[i][0].lower() != "como":
                 if lista[i][1] == "Identificador":
                     var_name = lista[i][0]
@@ -88,19 +98,12 @@ class AnalizadorSemantico:
                         self.errores.append(f"Línea {linea}: variable '{var_name}' ya declarada anteriormente")
                     else:
                         variables.append(var_name)
-                elif lista[i][0] == ",":
-                    pass  # Coma separadora, ignorar
-                else:
-                    if lista[i][0] not in [',', ';', ':']:
-                        self.errores.append(f"Línea {linea}: se esperaba identificador o 'Como' en declaración")
-                    return
                 i += 1
-            
-            # Verificar que siga "Como" y el tipo
+
             if i < len(lista) - 1 and lista[i][0].lower() == "como":
                 tipo = lista[i + 1][0].capitalize()
                 tipos_validos = {"Entero", "Real", "Caracter", "Logico"}
-                
+
                 if tipo in tipos_validos:
                     for var in variables:
                         self.tabla_simbolos[var] = {
@@ -115,10 +118,9 @@ class AnalizadorSemantico:
                 self.errores.append(f"Línea {linea}: declaración incompleta, falta 'Como [tipo]'")
 
     def _analizar_dimension_pseint(self, linea, lista):
-        """Analiza declaraciones con 'Dimension' de PSeInt"""
+        """Analiza declaraciones con 'Dimension'"""
         if len(lista) >= 2 and lista[0][0].lower() == "dimension":
-            i = 1
-            while i < len(lista):
+            for i in range(1, len(lista)):
                 token, tipo = lista[i]
                 if tipo == "Identificador":
                     var_name = token
@@ -132,209 +134,207 @@ class AnalizadorSemantico:
                         }
                     else:
                         self.errores.append(f"Línea {linea}: variable '{var_name}' ya declarada anteriormente")
+
+    def _analizar_funcion_pseint(self, linea, lista):
+        """Analiza definiciones de funciones"""
+        if len(lista) >= 2 and lista[0][0].lower() == "funcion":
+            nombre_funcion = None
+            parametros = []
+            tipo_retorno = "Void"
+
+            i = 1
+            if lista[i][1] == "Identificador":
+                nombre_funcion = lista[i][0]
                 i += 1
+            else:
+                self.errores.append(f"Línea {linea}: falta nombre de la función")
+                return
+
+            # Leer parámetros dentro de paréntesis
+            if i < len(lista) and lista[i][0] == "(":
+                i += 1
+                while i < len(lista) and lista[i][0] != ")":
+                    token, tipo = lista[i]
+                    if tipo == "Identificador":
+                        parametros.append(token)
+                    i += 1
+
+            # Registrar la función
+            if nombre_funcion in self.funciones:
+                self.errores.append(f"Línea {linea}: función '{nombre_funcion}' ya declarada anteriormente")
+            else:
+                self.funciones[nombre_funcion] = {
+                    "parametros": parametros,
+                    "tipo_retorno": tipo_retorno,
+                    "linea": linea,
+                    "usada": False
+                }
+
+    # ------------------------------------------------------------
+    # ASIGNACIONES Y USOS
+    # ------------------------------------------------------------
 
     def _analizar_asignaciones_pseint(self, linea, lista):
-        """Analiza asignaciones en PSeInt"""
+        """Analiza asignaciones (<-)"""
         for idx, (tok, tok_tipo) in enumerate(lista):
-            if tok == '<-' or tok == '=':
+            if tok in ('<-', '='):
                 if idx > 0 and idx < len(lista) - 1:
                     lhs_tok, lhs_tipo = lista[idx - 1]
-                    
-                    # Verificar que el lado izquierdo sea variable válida
+
                     if lhs_tipo == "Identificador":
                         if lhs_tok not in self.tabla_simbolos:
                             self.errores.append(f"Línea {linea}: variable '{lhs_tok}' no declarada")
                         else:
-                            # Marcar variable como usada e inicializada
-                            if isinstance(self.tabla_simbolos[lhs_tok], dict):
-                                self.tabla_simbolos[lhs_tok]['usada'] = True
-                                self.tabla_simbolos[lhs_tok]['inicializada'] = True
+                            self.tabla_simbolos[lhs_tok]['usada'] = True
+                            self.tabla_simbolos[lhs_tok]['inicializada'] = True
                             self.variables_usadas.add(lhs_tok)
-                        
-                        # Evaluar expresión del lado derecho
-                        expr_tokens = []
-                        j = idx + 1
-                        while j < len(lista):
-                            if lista[j][0] in [';', '<-', '=']:
-                                break
-                            expr_tokens.append(lista[j])
-                            j += 1
-                        
-                        if expr_tokens:
-                            tipo_expr = self._evaluar_expresion(expr_tokens, linea)
-                            if tipo_expr and lhs_tok in self.tabla_simbolos:
-                                tipo_decl = self._obtener_tipo_variable(lhs_tok)
-                                if tipo_decl and not self._compatibles_pseint(tipo_decl, tipo_expr):
-                                    self.errores.append(
-                                        f"Línea {linea}: incompatibilidad en asignación a '{lhs_tok}': '{tipo_decl}' <- '{tipo_expr}'"
-                                    )
+
+                        expr_tokens = lista[idx + 1:]
+                        tipo_expr = self._evaluar_expresion(expr_tokens, linea)
+                        if tipo_expr and lhs_tok in self.tabla_simbolos:
+                            tipo_decl = self._obtener_tipo_variable(lhs_tok)
+                            if tipo_decl and not self._compatibles_pseint(tipo_decl, tipo_expr):
+                                self.errores.append(
+                                    f"Línea {linea}: incompatibilidad en asignación '{lhs_tok}': {tipo_decl} <- {tipo_expr}"
+                                )
 
     def _verificar_usos_variables(self, linea, lista):
-        """Verifica usos correctos de variables - CORREGIDO"""
-        i = 0
-        
-        while i < len(lista):
-            tok, tok_tipo = lista[i]
-            
-            # Saltar comentarios
-            if tok_tipo == "Comentario":
-                i += 1
-                continue
-                
-            # Saltar cadenas completas
-            if tok_tipo == "Cadena":
-                i += 1
-                continue
-                
-            # Verificar solo identificadores que no sean palabras reservadas
+        """Verifica uso de variables"""
+        for i, (tok, tok_tipo) in enumerate(lista):
             if tok_tipo == "Identificador" and not self._es_palabra_reservada_pseint(tok):
-                # IGNORAR: Si es el nombre del algoritmo (primer identificador después de "Algoritmo")
-                if i > 0 and lista[i-1][0].lower() == "algoritmo":
-                    i += 1
+                if i > 0 and lista[i - 1][0].lower() == "algoritmo":
                     continue
-                    
+
                 if tok in self.tabla_simbolos:
-                    # Marcar como usada
-                    if isinstance(self.tabla_simbolos[tok], dict):
-                        self.tabla_simbolos[tok]['usada'] = True
+                    self.tabla_simbolos[tok]['usada'] = True
                     self.variables_usadas.add(tok)
-                    
-                    # Si está en una lectura (Leer), marcarla como inicializada
-                    if i > 0 and lista[i-1][0].lower() == "leer":
-                        if isinstance(self.tabla_simbolos[tok], dict):
-                            self.tabla_simbolos[tok]['inicializada'] = True
+
+                    if i > 0 and lista[i - 1][0].lower() == "leer":
+                        self.tabla_simbolos[tok]['inicializada'] = True
                 else:
-                    # Verificar contexto para evitar falsos positivos
                     if not self._es_contexto_seguro(lista, i):
                         self.errores.append(f"Línea {linea}: variable '{tok}' usada sin declarar")
-            
-            i += 1
+
+    def _verificar_llamadas_funciones(self, linea, lista):
+        """Verifica llamadas a funciones"""
+        for i in range(len(lista)):
+            token, tipo = lista[i]
+            if tipo == "Identificador" and i + 1 < len(lista) and lista[i + 1][0] == "(":
+                if not self._es_palabra_reservada_pseint(token):
+                    if token not in self.funciones:
+                        self.errores.append(f"Línea {linea}: función '{token}' no declarada")
+                    else:
+                        self.funciones[token]["usada"] = True
+
+    def _analizar_retorno_pseint(self, linea, lista, contexto_funcion):
+        """Analiza instrucciones 'Retornar'"""
+        for i, (tok, tipo) in enumerate(lista):
+            if tok.lower() == "retornar":
+                if not contexto_funcion:
+                    self.errores.append(f"Línea {linea}: 'Retornar' fuera de una función")
+                else:
+                    expr = lista[i + 1:] if i + 1 < len(lista) else []
+                    tipo_expr = self._evaluar_expresion(expr, linea)
+                    tipo_decl = self.funciones[contexto_funcion]["tipo_retorno"]
+                    if tipo_expr and tipo_decl != "Void" and not self._compatibles_pseint(tipo_decl, tipo_expr):
+                        self.errores.append(
+                            f"Línea {linea}: tipo de retorno incompatible en función '{contexto_funcion}' ({tipo_expr} ≠ {tipo_decl})"
+                        )
+
+    # ------------------------------------------------------------
+    # FUNCIONES AUXILIARES
+    # ------------------------------------------------------------
 
     def _es_contexto_seguro(self, lista, indice):
-        """Determina si el identificador está en un contexto seguro (no es variable)"""
-        # Si está después de Escribir, probablemente sea texto
-        for i in range(max(0, indice-5), indice):
-            if lista[i][0].lower() == "escribir":
+        """
+        Determina si un identificador está en un contexto donde no representa una variable real.
+        Versión genérica válida para cualquier pseudocódigo PSeInt.
+        """
+        if lista[indice][1] == "Cadena":
+            return True
+
+        for i in range(max(0, indice - 3), indice):
+            if lista[i][0].lower() in {"escribir", "mostrar"}:
                 return True
-                
-        # Si está en una estructura Segun...Hacer
-        for i in range(max(0, indice-3), min(len(lista), indice+2)):
-            if lista[i][0].lower() in ["segun", "hacer", "de", "otro", "modo"]:
+
+        for i in range(max(0, indice - 3), min(len(lista), indice + 3)):
+            if lista[i][0].lower() in {"segun", "de", "otro", "modo"}:
                 return True
-                
-        # Si está cerca de texto que indica menú o interfaz
-        palabras_menu = {'sistema', 'gestión', 'universidad', 'estudiante', 'estadísticas', 
-                        'buscar', 'agregar', 'mostrar', 'calcular', 'opción', 'seleccione',
-                        'salir', 'menú', 'presione', 'tecla', 'continuar'}
-        
-        for i in range(max(0, indice-2), min(len(lista), indice+2)):
-            if lista[i][0].lower() in palabras_menu:
+
+        for i in range(max(0, indice - 2), min(len(lista), indice + 2)):
+            if lista[i][0].lower() in {"funcion", "algoritmo", "proceso"}:
                 return True
-                
+
+        for i in range(max(0, indice - 1), indice):
+            if lista[i][0].lower() == "leer":
+                return True
+
+        if indice + 1 < len(lista) and lista[indice + 1][0] == "<-":
+            return True
+
         return False
 
     def _verificar_variables_no_usadas(self):
-        """Verifica variables declaradas pero no usadas"""
         for var_name, info in self.tabla_simbolos.items():
             if isinstance(info, dict) and not info['usada']:
                 self.errores.append(f"Línea {info['linea']}: variable '{var_name}' declarada pero no usada")
+
+    # ------------------------------------------------------------
+    # EVALUACIÓN DE EXPRESIONES Y TIPOS
+    # ------------------------------------------------------------
 
     def _evaluar_expresion(self, expr_tokens, linea):
         if not expr_tokens:
             return None
 
         operandos_tipos = []
-        operadores_pseint = {'+','-','*','/','%','^','=','<>','<','>','<=','>=','y','o','no','&'}
-
-        # Verificar si contiene operadores de comparación
+        operadores = {'+','-','*','/','%','^','=','<>','<','>','<=','>=','y','o','no','&'}
         contiene_comparador = any(tok[0] in {'=','<>','<','>','<=','>='} for tok in expr_tokens)
 
-        i = 0
-        while i < len(expr_tokens):
-            tok, tok_tipo = expr_tokens[i]
+        for tok, tok_tipo in expr_tokens:
             tok_lower = tok.lower()
 
-            # Ignorar comentarios y cadenas
             if tok.startswith("//") or tok_tipo == "Cadena":
-                i += 1
                 continue
-
-            # Ignorar signos de puntuación
             if tok in {',', '[', ']', ';', '(', ')'}:
-                i += 1
+                continue
+            if tok_lower in operadores:
                 continue
 
-            # Si es operador, continuar
-            if tok_lower in operadores_pseint:
-                i += 1
-                continue
-
-            # Manejar paréntesis para expresiones complejas
-            if tok == '(':
-                j = i + 1
-                profundidad = 1
-                while j < len(expr_tokens) and profundidad > 0:
-                    if expr_tokens[j][0] == '(':
-                        profundidad += 1
-                    elif expr_tokens[j][0] == ')':
-                        profundidad -= 1
-                    j += 1
-
-                if profundidad == 0:
-                    sub_expr = expr_tokens[i+1:j-1]
-                    tipo_sub = self._evaluar_expresion(sub_expr, linea)
-                    if tipo_sub:
-                        operandos_tipos.append(tipo_sub)
-                    i = j
-                    continue
-                else:
-                    i += 1
-                    continue
-
-            # Obtener tipo del token actual
             tipo = self._obtener_tipo_token(tok, tok_tipo)
             if tipo:
                 operandos_tipos.append(tipo)
-                # Marcar variable como usada
-                if tok_tipo == "Identificador" and tok in self.tabla_simbolos:
-                    if isinstance(self.tabla_simbolos[tok], dict):
-                        self.tabla_simbolos[tok]['usada'] = True
-                    self.variables_usadas.add(tok)
-
-            i += 1
 
         if not operandos_tipos:
             return None
 
-        # Si la expresión contiene comparadores, el resultado es siempre lógico
         if contiene_comparador:
             return 'Logico'
 
-        # Determinar tipo resultante basado en los operandos
         tipos_unicos = set(operandos_tipos)
-
-        # Reglas de compatibilidad PSeInt
-        if 'Caracter' in tipos_unicos and len(tipos_unicos) > 1:
-            return 'Caracter'
-
-        if 'Logico' in tipos_unicos and len(tipos_unicos) > 1:
-            return 'Logico'
-
-        # Jerarquía de tipos PSeInt
         if 'Real' in tipos_unicos:
             return 'Real'
-        if tipos_unicos == {'Logico'}:
-            return 'Logico'
-        if tipos_unicos == {'Caracter'}:
-            return 'Caracter'
         if 'Entero' in tipos_unicos:
             return 'Entero'
+        if 'Caracter' in tipos_unicos:
+            return 'Caracter'
+        if 'Logico' in tipos_unicos:
+            return 'Logico'
 
-        return operandos_tipos[0] if operandos_tipos else 'Entero'
+        return operandos_tipos[0]
+
+    def _tipo_de_literal(self, token, tipo_token):
+        if tipo_token == "Número":
+            return "Entero"
+        if tipo_token == "Decimal":
+            return "Real"
+        if tipo_token == "Cadena":
+            return "Caracter"
+        if token.lower() in ("verdadero", "falso"):
+            return "Logico"
+        return None
 
     def _obtener_tipo_token(self, token, tipo_token):
-        """Obtiene el tipo semántico de un token"""
         tipo_lit = self._tipo_de_literal(token, tipo_token)
         if tipo_lit:
             return tipo_lit
@@ -343,78 +343,62 @@ class AnalizadorSemantico:
         return None
 
     def _obtener_tipo_variable(self, variable):
-        """Obtiene el tipo de una variable de la tabla de símbolos"""
         if variable in self.tabla_simbolos:
             info = self.tabla_simbolos[variable]
             if isinstance(info, dict):
                 return info['tipo']
-            else:
-                return info
+            return info
         return None
 
     def _es_palabra_reservada_pseint(self, token):
-        """Verifica si un token es palabra reservada de PSeInt"""
-        palabras_reservadas = {
-            'algoritmo', 'finalgoritmo', 'proceso', 'finproceso',
-            'definir', 'como', 'entero', 'real', 'caracter', 'logico',
-            'escribir', 'leer', 'si', 'entonces', 'sino', 'finsi',
-            'para', 'hasta', 'con', 'paso', 'hacer', 'finpara',
-            'mientras', 'finmientras', 'repetir',
-            'segun', 'de', 'otro', 'finsegun',
-            'dimension', 'verdadero', 'falso', 'esperar', 'tecla'
+        palabras = {
+            'algoritmo','finalgoritmo','proceso','finproceso','funcion','finfuncion',
+            'definir','como','entero','real','caracter','logico','escribir','leer',
+            'si','entonces','sino','finsi','para','hasta','con','paso','hacer','finpara',
+            'mientras','finmientras','repetir','segun','de','otro','finsegun',
+            'dimension','verdadero','falso','esperar','tecla','retornar'
         }
-        return token.lower() in palabras_reservadas
+        return token.lower() in palabras
 
     def _compatibles_pseint(self, tipo_decl, tipo_expr):
-        """Verifica compatibilidad de tipos en PSeInt"""
         if tipo_decl == tipo_expr:
             return True
         if tipo_decl == 'Real' and tipo_expr == 'Entero':
-            return True  # Entero se puede asignar a Real
-        # PSeInt permite conversión implícita a cadena
+            return True
         if tipo_decl == 'Caracter' and tipo_expr in ['Entero', 'Real']:
             return True
         return False
 
+    # ------------------------------------------------------------
+    # REPORTE
+    # ------------------------------------------------------------
+
     def generar_reporte_semantico(self):
-        """Genera un reporte completo del análisis semántico"""
         if not self.errores:
-            reporte = "✓ ANÁLISIS SEMÁNTICO: Correcto - No se encontraron errores semánticos\n\n"
+            reporte = "✓ ANÁLISIS SEMÁNTICO: Correcto\n\n"
         else:
             reporte = "❌ ERRORES SEMÁNTICOS:\n"
             reporte += "----------------------\n"
             for error in self.errores:
                 reporte += f"• {error}\n"
-            reporte += f"\nTotal de errores semánticos: {len(self.errores)}\n\n"
+            reporte += f"\nTotal: {len(self.errores)} error(es)\n\n"
 
-        # Información de la tabla de símbolos
         if self.tabla_simbolos:
             reporte += "📊 TABLA DE SÍMBOLOS:\n"
             reporte += "---------------------\n"
-            
-            # Contar variables por tipo
-            contador_tipos = {}
-            for var, info in self.tabla_simbolos.items():
-                if isinstance(info, dict):
-                    tipo = info['tipo']
-                else:
-                    tipo = info
-                contador_tipos[tipo] = contador_tipos.get(tipo, 0) + 1
-            
             for var, info in sorted(self.tabla_simbolos.items()):
                 if isinstance(info, dict):
                     estado = "✓" if info['usada'] else "⚠️"
                     reporte += f"{estado} {var}: {info['tipo']}\n"
                 else:
                     reporte += f"? {var}: {info}\n"
-            
-            reporte += f"\nDISTRIBUCIÓN DE TIPOS:\n"
-            reporte += "----------------------\n"
-            for tipo, cantidad in contador_tipos.items():
-                reporte += f"• {tipo}: {cantidad} variable(s)\n"
-            
             reporte += f"\nTotal variables: {len(self.tabla_simbolos)}\n"
-        else:
-            reporte += "No hay variables declaradas\n"
+
+        if self.funciones:
+            reporte += "\n📘 FUNCIONES DETECTADAS:\n"
+            reporte += "------------------------\n"
+            for nombre, datos in self.funciones.items():
+                usadosim = "✓" if datos['usada'] else "⚠️"
+                reporte += f"{usadosim} {nombre}({', '.join(datos['parametros'])}) → {datos['tipo_retorno']}\n"
 
         return reporte
