@@ -1,0 +1,202 @@
+Algoritmo SistemaGestionUniversidadConFunciones
+    Definir opcionMenu, cantidadEstudiantes Como Entero
+    Definir continuar Como Logico
+    Dimension nombres[100], carreras[100], promedios[100]
+    Dimension materias[100, 5], notas[100, 5]
+
+    cantidadEstudiantes <- 0
+    continuar <- Verdadero
+
+    Mientras continuar Hacer
+        Escribir "===== SISTEMA DE GESTION UNIVERSITARIA ====="
+        Escribir "1. Agregar estudiante"
+        Escribir "2. Buscar estudiante"
+        Escribir "3. Calcular estadisticas"
+        Escribir "4. Mostrar todos los estudiantes"
+        Escribir "5. Salir"
+        Escribir "Seleccione una opcion: "
+        Leer opcionMenu
+
+        Segun opcionMenu Hacer
+            1:
+                AgregarEstudiante(nombres, carreras, materias, notas, promedios, cantidadEstudiantes)
+            2:
+                BuscarEstudiante(nombres, carreras, materias, notas, promedios, cantidadEstudiantes)
+            3:
+                CalcularEstadisticas(nombres, promedios, cantidadEstudiantes)
+            4:
+                MostrarEstudiantes(nombres, carreras, promedios, cantidadEstudiantes)
+            5:
+                Escribir "Gracias por usar el sistema. ¡Hasta pronto!"
+                continuar <- Falso
+            De Otro Modo:
+                Escribir "Opcion no valida. Intente nuevamente."
+        FinSegun
+
+        Si opcionMenu <> 5 Entonces
+            Escribir "Presione una tecla para continuar..."
+            Esperar Tecla
+        FinSi
+    FinMientras
+FinAlgoritmo
+
+Funcion AgregarEstudiante(nombres, carreras, materias, notas, promedios, cantidadEstudiantes)
+    Definir nombreEstudiante, carrera Como Caracter
+    Definir nota, sumaNotas Como Real
+    Definir i Como Entero
+
+    Si cantidadEstudiantes < 100 Entonces
+        Escribir "Ingrese nombre del estudiante: "
+        Leer nombreEstudiante
+        Escribir "Ingrese carrera: "
+        Leer carrera
+
+        nombres[cantidadEstudiantes] <- nombreEstudiante
+        carreras[cantidadEstudiantes] <- carrera
+        sumaNotas <- 0
+
+        Para i <- 0 Hasta 4 Hacer
+            materias[cantidadEstudiantes, i] <- ElegirMateria(i)
+            Escribir "Ingrese nota para ", materias[cantidadEstudiantes, i], ": "
+            Leer nota
+            Mientras nota < 0 O nota > 10 Hacer
+                Escribir "Nota invalida. Ingrese nota entre 0 y 10: "
+                Leer nota
+            FinMientras
+            notas[cantidadEstudiantes, i] <- nota
+            sumaNotas <- sumaNotas + nota
+        FinPara
+
+        promedios[cantidadEstudiantes] <- sumaNotas / 5
+        cantidadEstudiantes <- cantidadEstudiantes + 1
+        Escribir "Estudiante agregado exitosamente!"
+    Sino
+        Escribir "Error: Base de datos llena"
+    FinSi
+FinFuncion
+
+Funcion ElegirMateria(indice)
+    Segun indice Hacer
+        0: Retornar "Matematicas"
+        1: Retornar "Programacion"
+        2: Retornar "Fisica"
+        3: Retornar "Quimica"
+        4: Retornar "Historia"
+    FinSegun
+FinFuncion
+
+Funcion BuscarEstudiante(nombres, carreras, materias, notas, promedios, cantidadEstudiantes)
+    Definir busqueda Como Caracter
+    Definir i, j, indice Como Entero
+    Definir encontrado Como Logico
+
+    Si cantidadEstudiantes > 0 Entonces
+        Escribir "Ingrese nombre a buscar: "
+        Leer busqueda
+        encontrado <- Falso
+
+        Para i <- 0 Hasta cantidadEstudiantes - 1 Hacer
+            Si nombres[i] = busqueda Entonces
+                encontrado <- Verdadero
+                indice <- i
+                i <- cantidadEstudiantes
+            FinSi
+        FinPara
+
+        Si encontrado Entonces
+            Escribir "Nombre: ", nombres[indice]
+            Escribir "Carrera: ", carreras[indice]
+            Escribir "Promedio: ", promedios[indice]
+            Para j <- 0 Hasta 4 Hacer
+                Escribir materias[indice, j], ": ", notas[indice, j]
+            FinPara
+            Escribir "Estado: ", DeterminarEstado(promedios[indice])
+        Sino
+            Escribir "Estudiante no encontrado"
+        FinSi
+    Sino
+        Escribir "No hay estudiantes registrados"
+    FinSi
+FinFuncion
+
+Funcion DeterminarEstado(promedio)
+    Si promedio >= 7 Entonces
+        Retornar "APROBADO"
+    Sino
+        Si promedio >= 4 Entonces
+            Retornar "RECUPERACION"
+        Sino
+            Retornar "REPROBADO"
+        FinSi
+    FinSi
+FinFuncion
+
+Funcion CalcularEstadisticas(nombres, promedios, cantidadEstudiantes)
+    Definir i, aprobados, reprobados Como Entero
+    Definir promedioGeneral, maxPromedio, minPromedio Como Real
+    Definir mejorEstudiante, peorEstudiante Como Caracter
+
+    Si cantidadEstudiantes > 0 Entonces
+        promedioGeneral <- 0
+        maxPromedio <- 0
+        minPromedio <- 10
+        aprobados <- 0
+        reprobados <- 0
+
+        Para i <- 0 Hasta cantidadEstudiantes - 1 Hacer
+            promedioGeneral <- promedioGeneral + promedios[i]
+            Si promedios[i] > maxPromedio Entonces
+                maxPromedio <- promedios[i]
+                mejorEstudiante <- nombres[i]
+            FinSi
+            Si promedios[i] < minPromedio Entonces
+                minPromedio <- promedios[i]
+                peorEstudiante <- nombres[i]
+            FinSi
+            Si promedios[i] >= 7 Entonces
+                aprobados <- aprobados + 1
+            Sino
+                reprobados <- reprobados + 1
+            FinSi
+        FinPara
+
+        promedioGeneral <- promedioGeneral / cantidadEstudiantes
+        Escribir "Promedio general: ", promedioGeneral
+        Escribir "Mejor promedio: ", maxPromedio, " (", mejorEstudiante, ")"
+        Escribir "Peor promedio: ", minPromedio, " (", peorEstudiante, ")"
+        Escribir "Aprobados: ", aprobados
+        Escribir "Reprobados: ", reprobados
+        Escribir "Porcentaje de aprobacion: ", (aprobados * 100 / cantidadEstudiantes), "%"
+    Sino
+        Escribir "No hay estudiantes registrados"
+    FinSi
+FinFuncion
+
+Funcion MostrarEstudiantes(nombres, carreras, promedios, cantidadEstudiantes)
+    Definir i Como Entero
+
+    Si cantidadEstudiantes > 0 Entonces
+        Para i <- 0 Hasta cantidadEstudiantes - 1 Hacer
+            Escribir "Estudiante #", i + 1
+            Escribir "Nombre: ", nombres[i]
+            Escribir "Carrera: ", carreras[i]
+            Escribir "Promedio: ", promedios[i]
+            Escribir "Estado: ", ClasificarPromedio(promedios[i])
+            Escribir ""
+        FinPara
+    Sino
+        Escribir "No hay estudiantes registrados"
+    FinSi
+FinFuncion
+
+Funcion ClasificarPromedio(promedio)
+    Si promedio >= 7 Entonces
+        Retornar "Excelente"
+    Sino
+        Si promedio >= 5 Entonces
+            Retornar "Regular"
+        Sino
+            Retornar "Deficiente"
+        FinSi
+    FinSi
+FinFuncion

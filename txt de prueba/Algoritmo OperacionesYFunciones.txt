@@ -1,0 +1,129 @@
+Algoritmo OperacionesBasicas
+    Definir a, b, r Como Real
+    Definir x, y, z Como Entero
+    Definir t1, t2, t3 Como Caracter
+    Definir l1, l2, l3 Como Logico
+    
+    Escribir "INGRESE DOS NUMEROS:"
+    Leer a
+    Leer b
+    
+    Escribir "INGRESE DOS TEXTOS:"
+    Leer t1
+    Leer t2
+    
+    Escribir "OPERACIONES ARITMETICAS:"
+    r = a + b
+    Escribir "SUMA: ", a, " + ", b, " = ", r
+    
+    r = a - b
+    Escribir "RESTA: ", a, " - ", b, " = ", r
+    
+    r = a * b
+    Escribir "MULTIPLICACION: ", a, " * ", b, " = ", r
+    
+    Si b <> 0 Entonces
+        r = a / b
+        Escribir "DIVISION: ", a, " / ", b, " = ", r
+    Sino
+        Escribir "NO SE PUEDE DIVIDIR POR CERO"
+    FinSi
+    
+    Escribir ""
+    Escribir "OPERACIONES RELACIONALES:"
+    l1 = a > b
+    Escribir a, " > ", b, " = ", l1
+    
+    l1 = a < b
+    Escribir a, " < ", b, " = ", l1
+    
+    l1 = a == b
+    Escribir a, " == ", b, " = ", l1
+    
+    l1 = a <> b
+    Escribir a, " <> ", b, " = ", l1
+    
+    Escribir ""
+    Escribir "OPERACIONES LOGICAS:"
+    l1 = Verdadero
+    l2 = Falso
+    l3 = l1 Y l2
+    Escribir "VERDADERO Y FALSO = ", l3
+    
+    l3 = l1 O l2
+    Escribir "VERDADERO O FALSO = ", l3
+    
+    l3 = NO l1
+    Escribir "NO VERDADERO = ", l3
+    
+    Escribir ""
+    Escribir "OPERACIONES CON TEXTO:"
+    t3 = t1 + t2
+    Escribir "CONCATENAR: ", t1, " + ", t2, " = ", t3
+    
+    Escribir "LONGUITUD TEXTO 1: ", Longitud(t1)
+    Escribir "LONGUITUD TEXTO 2: ", Longitud(t2)
+    
+    Escribir ""
+    Escribir "LLAMADAS A FUNCIONES:"
+    
+    r = FuncionSuma(a, b)
+    Escribir "FUNCION SUMA: ", r
+    
+    r = FuncionResta(a, b)
+    Escribir "FUNCION RESTA: ", r
+    
+    l1 = FuncionCompara(a, b)
+    Escribir "FUNCION COMPARA: ", l1
+    
+    Escribir ""
+    Escribir "USO DE ARREGLO:"
+    Definir arr Como Entero
+    Dimension arr[3]
+    
+    arr[1] = 10
+    arr[2] = 20
+    arr[3] = 30
+    
+    Escribir "ARREGLO POSICION 1: ", arr[1]
+    Escribir "ARREGLO POSICION 2: ", arr[2]
+    Escribir "ARREGLO POSICION 3: ", arr[3]
+    
+    Escribir ""
+    Escribir "CICLO FOR:"
+    Para x = 1 Hasta 3 Hacer
+        Escribir "CONTADOR: ", x
+    FinPara
+    
+    Escribir ""
+    Escribir "CONDICIONAL SI:"
+    Si a > 0 Entonces
+        Escribir a, " ES POSITIVO"
+    Sino
+        Si a < 0 Entonces
+            Escribir a, " ES NEGATIVO"
+        Sino
+            Escribir a, " ES CERO"
+        FinSi
+    FinSi
+    
+FinAlgoritmo
+
+Funcion resultado <- FuncionSuma(n1, n2)
+    Definir resultado Como Real
+    resultado = n1 + n2
+FinFuncion
+
+Funcion resultado <- FuncionResta(n1, n2)
+    Definir resultado Como Real
+    resultado = n1 - n2
+FinFuncion
+
+Funcion resultado <- FuncionCompara(n1, n2)
+    Definir resultado Como Logico
+    resultado = n1 > n2
+FinFuncion
+
+SubProceso MostrarMensaje()
+    Escribir "ESTE ES UN SUBPROCESO"
+FinSubProceso
